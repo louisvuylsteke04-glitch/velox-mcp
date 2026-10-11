@@ -9,7 +9,10 @@ import { fmtTime } from "../engine/goal";
 import { addDaysYMD } from "../engine/dates";
 import { blockFromPlan, sessionsBetween } from "../block/plan";
 import { Athlete, Runs, Today, nowMsOf, prepareRuns } from "./common";
-import { blockContent } from "./plan-common";
+import { PlanBlockText, blockContent, readBlock } from "./plan-common";
+import { addDaysYMD as plusDays } from "../engine/dates";
+import { sealBlock } from "../block/codec";
+import type { PlanBlock } from "../block/schema";
 
 const Day = z.number().int().min(1).max(7);
 
@@ -50,7 +53,9 @@ const Input = z.object({
     })).max(8).nullish().describe("Anything bothering them now. Shapes restrictions; a red flag stops hard training."),
   }).nullish(),
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish().describe("Start later than next Monday. Snapped to its Monday."),
-  first_plan: z.boolean().default(true).describe("True for an athlete's first Vēlox plan: week 1 becomes an assessment week with a time trial that sets their paces."),
+  first_plan: z.boolean().nullish().describe("True for an athlete's first Vēlox plan: week 1 becomes an assessment week with a time trial that sets their paces. Defaults to true, or false when previous_block is given."),
+  previous_block: PlanBlockText.nullish().describe("When rebuilding: the current plan block. Its log, history and athlete details carry over, and logged effort, feelings and pain shape the new plan."),
+  reason: z.enum(["new_plan", "rebuild", "benchmark_recalibration", "checkin_2w"]).default("new_plan").describe("Why this plan is built: a new plan, a re-entry rebuild after a long gap, or a check-in from the missed-session policy or review."),
   blueprint: z.record(z.string(), z.unknown()).nullish().describe("The coach's blueprint. Omit on the first call; then write one from the returned brief and call again with it."),
   request: z.string().max(600).nullish().describe("Anything the athlete asked for in this plan, in their words."),
 });
@@ -73,8 +78,23 @@ export function registerBuildPlan(server: McpServer): void {
     async (input) => {
       const { today } = input;
       const nowMs = nowMsOf(today);
-      const prep = prepareRuns(input.runs, input.athlete, today);
-      const ath = input.athlete;
+      let prev: PlanBlock | null = null;
+      if (input.previous_block) {
+        const r = readBlock(input.previous_block);
+        if ("error" in r) return r.error;
+        prev = r.block;
+      }
+      const pa = prev?.athlete;
+      const ath = {
+        ...input.athlete,
+        name: input.athlete?.name ?? pa?.name ?? null,
+        birth_date: input.athlete?.birth_date ?? pa?.birth_date ?? null,
+        sex: input.athlete?.sex ?? pa?.sex ?? null,
+        experience: input.athlete?.experience ?? (pa?.experience as "beginner" | "intermediate" | "advanced" | null | undefined) ?? null,
+        max_hr: input.athlete?.max_hr ?? pa?.max_hr ?? null,
+        rest_hr: input.athlete?.rest_hr ?? pa?.rest_hr ?? null,
+      };
+      const prep = prepareRuns(input.runs, ath, today);
 
       const goal: PlanGoal | null = input.goal && !(input.goal.goal_type === "improve_fitness" && !input.goal.race_date)
         ? {
@@ -87,6 +107,7 @@ export function registerBuildPlan(server: McpServer): void {
 
       const p = input.preferences ?? {};
       const preferences: Record<string, unknown> = {
+        ...(prev && !input.preferences ? prev.athlete.prefs : {}),
         ...(p.available_days != null ? { available_days: p.available_days } : {}),
         ...(p.preferred_days?.length ? { preferred_days: p.preferred_days } : {}),
         ...(p.long_run_day != null ? { long_run_day: p.long_run_day } : {}),
@@ -100,12 +121,21 @@ export function registerBuildPlan(server: McpServer): void {
         severity: c.severity ?? null, status: "active", last_mentioned_at: `${today}T12:00:00Z`,
       }));
 
-      const profileRuns: ProfileRun[] = prep.features.map((f, i) => ({ ...f, rpe: prep.rpe[i] }));
+      // Logged effort from the previous block: RPE onto its run, and the web app's
+      // feedback rows (RPE and fatigue, 28 days) and pain logs (10 days).
+      const rpeByDate = new Map((prev?.log ?? []).filter((e) => e.rpe != null).map((e) => [`${e.date}|${Math.round(e.km)}`, e.rpe]));
+      const profileRuns: ProfileRun[] = prep.features.map((f, i) => ({ ...f, rpe: prep.rpe[i] ?? rpeByDate.get(`${f.activity_date}|${Math.round(f.distance_km)}`) ?? null }));
+      const since28 = plusDays(today, -28);
+      const since10 = plusDays(today, -10);
+      const feedback = (prev?.log ?? []).filter((e) => e.date >= since28 && (e.rpe != null || e.feeling != null))
+        .map((e) => ({ rpe: e.rpe, fatigue_rating: e.feeling != null ? 6 - e.feeling : null }));
+      const painLogs = (prev?.log ?? []).filter((e) => e.date >= since10 && e.pain?.length).map((e) => ({ activity_date: e.date, pain_areas: e.pain }));
+      const injuryHistory = input.injuries?.history ?? prev?.athlete.injury_history ?? null;
       const profile = buildAthleteProfile({
         today, nowMs, runs: profileRuns,
         name: ath?.name ?? null, birthDate: ath?.birth_date ?? null, sex: ath?.sex ?? null,
         experienceLevel: ath?.experience ?? null, maxHr: ath?.max_hr ?? null, restHr: ath?.rest_hr ?? null,
-        injuryHistory: input.injuries?.history ?? null, concerns, painLogs: null, feedback: null,
+        injuryHistory, concerns, painLogs, feedback,
         preferences,
         anchor: anchorDataFrom({
           runs: prep.features,
@@ -120,17 +150,37 @@ export function registerBuildPlan(server: McpServer): void {
 
       const result = buildPlan({
         profile, goal, today, startDate: input.start_date ?? null,
-        blueprint: input.blueprint ?? null, assessment: input.first_plan, constraint: input.request ?? null,
+        blueprint: input.blueprint ?? null, assessment: input.first_plan ?? !prev, constraint: input.request ?? null,
       });
 
-      const block = blockFromPlan({
+      const built = blockFromPlan({
         result, profile, goal, today, prefs: preferences,
         athlete: {
           name: ath?.name ?? null, birth_date: ath?.birth_date ?? null, sex: ath?.sex ?? null,
           experience: ath?.experience ?? null, max_hr: ath?.max_hr ?? null, rest_hr: ath?.rest_hr ?? null,
-          injury_history: input.injuries?.history ?? [],
+          injury_history: injuryHistory ?? [],
         },
       });
+      // A rebuild keeps the athlete's log and the plan line's history.
+      const block: PlanBlock = prev
+        ? (() => {
+            const { check: _c, ...rest } = built;
+            void _c;
+            const done = new Set(prev.history.checkins_done);
+            if (input.reason === "benchmark_recalibration" || input.reason === "checkin_2w") done.add(input.reason);
+            return sealBlock({
+              ...rest,
+              log: prev.log,
+              history: {
+                ...prev.history,
+                plan_created: prev.history.plan_created ?? prev.made,
+                first_session: prev.history.first_session ?? prev.sessions[0]?.date ?? null,
+                checkins_done: [...done],
+                last_rebuild: input.reason === "rebuild" ? today : prev.history.last_rebuild,
+              },
+            });
+          })()
+        : built;
 
       const firstWeek = sessionsBetween(block, today, addDaysYMD(result.planStart, 6));
       const weeks = block.plan.weeks.map((w) => {

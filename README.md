@@ -24,10 +24,10 @@ Early. The engine is being ported from the Vēlox web app. See [`docs/PLAN.md`](
 
 | Milestone | Status |
 |---|---|
-| M1 Scaffold, `velox_ping` | in review |
-| M2 Load, zones, race prediction | in review |
-| M3 Plan engine and plan block | in review |
-| M4 Logging runs and adapting the plan | planned |
+| M1 Scaffold, `velox_ping` | done |
+| M2 Load, zones, race prediction | done |
+| M3 Plan engine and plan block | done |
+| M4 Logging runs and adapting the plan | in review |
 | M5 Coaching prompts, deploy, setup guide | planned |
 
 ## Develop

@@ -151,7 +151,10 @@ export function blockFromPlan(args: {
     },
     sessions: sessions.map(({ _segs: _s, _cue: _c, ...rest }) => { void _s; void _c; return rest; }),
     log: [],
-    history: { last_rebuild: null, last_adapt: null, last_restoration: null },
+    history: {
+      last_rebuild: null, last_adapt: null, last_missed_adapt: null, last_restoration: null,
+      plan_created: today, first_session: sessions[0]?.date ?? null, checkins_done: [],
+    },
   };
 
   // Store structure and cues only where the engine could not rebuild them from the block.

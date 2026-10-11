@@ -7,6 +7,9 @@ import { registerZonesAndPaces } from "./tools/zones-and-paces";
 import { registerPredictRace } from "./tools/predict-race";
 import { registerBuildPlan } from "./tools/build-plan";
 import { registerGetSessions } from "./tools/get-sessions";
+import { registerLogRun } from "./tools/log-run";
+import { registerAdaptPlan } from "./tools/adapt-plan";
+import { registerReviewWeek } from "./tools/review-week";
 
 /**
  * Every tool, prompt and resource is registered here. The server is
@@ -20,6 +23,9 @@ export function registerVelox(server: McpServer): void {
   registerPredictRace(server);
   registerBuildPlan(server);
   registerGetSessions(server);
+  registerLogRun(server);
+  registerAdaptPlan(server);
+  registerReviewWeek(server);
 }
 
 export function createVeloxHandler(): (request: Request) => Promise<Response> {

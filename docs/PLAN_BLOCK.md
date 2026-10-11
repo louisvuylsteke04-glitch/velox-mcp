@@ -20,11 +20,11 @@ Compact JSON. Field order and whitespace do not matter.
 | `goal` | Race type, date, distance (ultra only) and target time, or `null` for a general block. |
 | `plan` | Start Monday, length, the coach's notes, every week's phase, target km and long-run cap, and the **blueprint** (the coach's weekly template, quality focus and long-run texture per phase, and week overrides). |
 | `sessions` | One entry per session: `id` (its date, `.2` for a second session that day), `date`, `week`, `type`, `km`, and when set `min`, `zone`, `title`, `pinned`. |
-| `log` | Runs, feelings and notes the athlete logged (from M4). |
-| `history` | Dates of the last rebuild, adaptation and restoration (from M4). |
+| `log` | Every run the athlete logged, oldest first: date, Strava id, the session it completed, km, minutes, average HR, run kind, RPE, feeling (1-5), note (their words, treated as data), and pain by body part. At most 400 entries. |
+| `history` | Dates of the last rebuild, adaptation, missed-session adaptation and restoration, plus the original plan's creation date, first session and which check-ins are done. A rebuild keeps all of it. |
 | `check` | Checksum of everything above. |
 
-Session fields left out mean their default: `status` planned, `edits` 0, `min` and `zone` none. Once a session is edited, `authored` keeps the values it was born with, so an adaptation is always measured against the original plan.
+Sessions also carry a `status` (planned, completed, skipped). Fields left out mean their default: `status` planned, `edits` 0, `min` and `zone` none. Once a session is edited, `authored` keeps the values it was born with, so an adaptation is always measured against the original plan.
 
 ## What is not stored
 
