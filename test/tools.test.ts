@@ -15,10 +15,10 @@ const male = { max_hr: 190, rest_hr: 50, sex: "male" };
 const golden = (athletes as Record<string, any>).male_190_50; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 describe("tool registry", () => {
-  it("lists every M2 tool as read-only with an input schema", async () => {
+  it("lists every tool as read-only with an input schema", async () => {
     const { body } = await rpc("tools/list");
     const names = body.result.tools.map((t: { name: string }) => t.name).sort();
-    expect(names).toEqual(["velox_analyze_training", "velox_ping", "velox_predict_race", "velox_zones_and_paces"]);
+    expect(names).toEqual(["velox_analyze_training", "velox_build_plan", "velox_get_sessions", "velox_ping", "velox_predict_race", "velox_zones_and_paces"]);
     for (const t of body.result.tools) {
       expect(t.annotations.readOnlyHint).toBe(true);
       expect(t.inputSchema.type).toBe("object");
