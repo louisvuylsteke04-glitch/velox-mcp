@@ -3,7 +3,7 @@
  * (scripts/golden/generate.ts, which runs the original Vēlox web-app code) and
  * the parity tests (which run the port). No real athlete data.
  */
-import type { RunInput } from "@/src/engine/load/run-features";
+import type { RunInput } from "../../src/engine/load/run-features";
 
 /** "Now" for every golden case: 2026-10-11 08:00 UTC. */
 export const NOW_MS = Date.UTC(2026, 9, 11, 8, 0, 0);

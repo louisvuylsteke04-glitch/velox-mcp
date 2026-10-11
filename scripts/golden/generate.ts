@@ -9,10 +9,10 @@
  * Read-only against the web app: nothing there is modified and no network or
  * database call is made (the Supabase client is stubbed in memory).
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import ts from "typescript";
-import { ATHLETES, NOW_MS, TODAY, START, buildRuns, type FixtureRun } from "../../test/golden/fixtures";
+import { ATHLETES, NOW_MS, TODAY, START, buildRuns } from "../../test/golden/fixtures";
+import { computeFeaturesFrom } from "./compute-features";
 
 const VELOX = resolve(process.argv[2] ?? ".");
 const OUT = resolve(__dirname, "../../test/golden");
@@ -32,34 +32,6 @@ globalThis.Date = FrozenDate as DateConstructor;
 function write(name: string, data: unknown) {
   writeFileSync(join(OUT, name), JSON.stringify(data) + "\n");
   console.log(`wrote test/golden/${name}`);
-}
-
-/** The Strava API shape the web app's computeFeatures expects. */
-function toStrava(r: FixtureRun) {
-  return {
-    name: r.name, distance: r.distance_m, moving_time: r.moving_time_s,
-    elapsed_time: r.elapsed_time_s ?? r.moving_time_s, total_elevation_gain: r.elevation_gain_m ?? 0,
-    start_date_local: r.start_local, start_date: r.start_local + "Z",
-    average_heartrate: r.average_heartrate ?? undefined, average_cadence: r.average_cadence ?? undefined,
-    average_speed: r.avg_speed_mps ?? undefined, workout_type: r.workout_type ?? undefined,
-  };
-}
-
-/**
- * computeFeatures is module-private in lib/strava-sync.ts, so lift its source
- * (plus the regexes and helpers it uses) and evaluate it in isolation.
- */
-function loadComputeFeatures(banisterCoeffs: unknown) {
-  const src = readFileSync(lib("strava-sync.ts"), "utf8");
-  const slice = (from: string, to: string) => src.slice(src.indexOf(from), src.indexOf(to));
-  const easyAt = src.indexOf("const EASY_RE");
-  const code = [
-    src.slice(src.indexOf("const RACE_RE"), src.indexOf("\n", easyAt)),
-    slice("function classifyFromName", "/**\n * Detailed derived metrics for a non-run"),
-    "return computeFeatures;",
-  ].join("\n");
-  const js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
-  return new Function("banisterCoeffs", js)(banisterCoeffs) as (a: unknown, maxHr: number, restHr: number, sex: string | null) => Record<string, unknown>;
 }
 
 function stubSupabase(client: { from: unknown }, rows: unknown[]) {
@@ -86,14 +58,14 @@ async function main() {
   const gp = await import(lib("goal-paces.ts"));
   const sb = await import(lib("supabase.ts"));
   const dc = await import(lib("dashboard-compute.ts"));
-  const computeFeatures = loadComputeFeatures(tl.banisterCoeffs);
+  const computeFeatures = computeFeaturesFrom(VELOX, tl.banisterCoeffs);
 
   const runs = buildRuns();
 
   // ── features + load model + snapshot, per athlete ────────────────────────
   const perAthlete: Record<string, unknown> = {};
   for (const ath of ATHLETES) {
-    const features = runs.map((r) => computeFeatures(toStrava(r), ath.maxHr, ath.restHr, ath.sex));
+    const features = runs.map((r) => computeFeatures(r, ath.maxHr, ath.restHr, ath.sex));
     const runDaily = features.map((f, i) => ({
       activity_date: f.activity_date, trimp: f.trimp, moving_time_min: f.moving_time_min,
       distance_km: f.distance_km, data_quality_score: f.data_quality_score, rpe: runs[i].rpe,
