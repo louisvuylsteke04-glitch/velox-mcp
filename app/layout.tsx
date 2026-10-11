@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { APP_NAME } from "@/src/branding";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: `${APP_NAME}. An open-source running coach for Claude.`,
@@ -10,9 +11,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, background: "#F7F3EC", color: "#2A2520", fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

@@ -10,6 +10,8 @@ import { registerGetSessions } from "./tools/get-sessions";
 import { registerLogRun } from "./tools/log-run";
 import { registerAdaptPlan } from "./tools/adapt-plan";
 import { registerReviewWeek } from "./tools/review-week";
+import { registerCoach } from "./coach";
+import { SERVER_INSTRUCTIONS } from "./content/workflows";
 
 /**
  * Every tool, prompt and resource is registered here. The server is
@@ -26,11 +28,13 @@ export function registerVelox(server: McpServer): void {
   registerLogRun(server);
   registerAdaptPlan(server);
   registerReviewWeek(server);
+  registerCoach(server);
 }
 
 export function createVeloxHandler(): (request: Request) => Promise<Response> {
   return createMcpHandler(registerVelox, {
     serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
+    instructions: SERVER_INSTRUCTIONS,
     verboseLogs: false,
   });
 }
