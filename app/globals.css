@@ -1,0 +1,31 @@
+:root {
+  --paper: #F7F3EC;
+  --paper2: #EFEAE0;
+  --ink: #2A2520;
+  --moss: #5C8B5A;
+  --sage: #A3C9A0;
+  --fg2: #6B6357;
+  --fg3: #9A9082;
+  --fg4: #C9C0B0;
+  --surface: #FFFFFF;
+  --border: #E5DFD3;
+  --chrome: #FBF8F2;
+  --chrome-border: #F0EBE0;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: var(--font-jetbrains-mono, "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+a { color: var(--ink); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.rise { opacity: 0; transform: translateY(8px); animation: rise 500ms ease forwards; }
+.rise.d1 { animation-delay: 80ms; }
+.rise.d2 { animation-delay: 160ms; }
+.rise.d3 { animation-delay: 240ms; }
+.rise.d4 { animation-delay: 320ms; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .rise { opacity: 1; transform: none; animation: none; }
+}
