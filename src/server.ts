@@ -2,6 +2,11 @@ import { createMcpHandler } from "mcp-handler";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { SERVER_NAME, SERVER_VERSION } from "./branding";
 import { registerPing } from "./tools/ping";
+import { registerAnalyzeTraining } from "./tools/analyze-training";
+import { registerZonesAndPaces } from "./tools/zones-and-paces";
+import { registerPredictRace } from "./tools/predict-race";
+import { registerBuildPlan } from "./tools/build-plan";
+import { registerGetSessions } from "./tools/get-sessions";
 
 /**
  * Every tool, prompt and resource is registered here. The server is
@@ -10,6 +15,11 @@ import { registerPing } from "./tools/ping";
  */
 export function registerVelox(server: McpServer): void {
   registerPing(server);
+  registerAnalyzeTraining(server);
+  registerZonesAndPaces(server);
+  registerPredictRace(server);
+  registerBuildPlan(server);
+  registerGetSessions(server);
 }
 
 export function createVeloxHandler(): (request: Request) => Promise<Response> {
