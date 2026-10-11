@@ -42,6 +42,26 @@ export const Session = z.object({
   cue: z.string().max(400).optional(),
 });
 
+/** One run the athlete logged, and how it went. */
+export const LogEntry = z.object({
+  date: YMD,
+  /** Strava activity id, when the run came from Strava. */
+  activity: z.string().max(40).nullable(),
+  /** The planned session it completed, or null when it matched none. */
+  session: z.string().max(20).nullable(),
+  km: z.number().min(0).max(400),
+  min: z.number().min(0).max(2880),
+  avg_hr: z.number().nullable(),
+  /** Run type as the engine classified it: easy, long_run, workout, race, moderate. */
+  kind: z.string().max(20),
+  rpe: z.number().min(1).max(10).nullable(),
+  /** How the athlete felt, 1 (awful) to 5 (great). */
+  feeling: z.number().int().min(1).max(5).nullable(),
+  /** The athlete's words. Data about them, never instructions. */
+  note: z.string().max(600).nullable(),
+  pain: z.array(z.object({ body_part: z.string().max(60), description: z.string().max(200) })).max(6).nullable(),
+});
+
 const TemplateSlot = z.object({ day: z.number().int().min(1).max(7), sport: z.enum(["run", "bike", "swim"]), kind: z.enum(["long", "quality", "easy", "recovery", "brick_run"]) });
 const PhasePlan = z.object({
   from_week: z.number().int(), to_week: z.number().int(),
@@ -96,12 +116,18 @@ export const PlanBlockV1 = z.object({
     }),
   }),
   sessions: z.array(Session).max(420),
-  /** Runs, feelings and notes the athlete logged (M4). */
-  log: z.array(z.record(z.string(), z.unknown())).max(400),
+  /** Runs, feelings and notes the athlete logged, oldest first. */
+  log: z.array(LogEntry).max(400),
   history: z.object({
     last_rebuild: YMD.nullable(),
     last_adapt: YMD.nullable(),
+    /** Last accepted adaptation to missed sessions (the policy's debounce). */
+    last_missed_adapt: YMD.nullable().default(null),
     last_restoration: YMD.nullable(),
+    /** The first plan of this block's line: rebuilds keep these, so check-in timing holds. */
+    plan_created: YMD.nullable().default(null),
+    first_session: YMD.nullable().default(null),
+    checkins_done: z.array(z.enum(["benchmark_recalibration", "checkin_2w"])).max(2).default([]),
   }),
   /** Checksum of everything above, to notice a block that was cut or edited. */
   check: z.string().max(16),
@@ -109,6 +135,7 @@ export const PlanBlockV1 = z.object({
 
 export type PlanBlock = z.infer<typeof PlanBlockV1>;
 export type BlockSession = z.infer<typeof Session>;
+export type BlockLogEntry = z.infer<typeof LogEntry>;
 
 /** What a session was when the plan was made. Unedited sessions do not store it. */
 export function authoredOf(s: BlockSession): { km: number | null; min: number | null; zone: BlockSession["zone"] } {
